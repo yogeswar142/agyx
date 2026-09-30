@@ -1,0 +1,56 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/agyx-core",
+    "crates/agyx-cli",
+]
+
+[workspace.package]
+version    = "0.1.0"
+edition    = "2021"
+authors    = ["AGYX Contributors"]
+repository = "https://github.com/yogeswar142/agyx"
+license    = "MIT"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Core async runtime
+tokio        = { version = "1", features = ["full"] }
+
+# CLI
+clap         = { version = "4", features = ["derive", "color", "suggestions"] }
+indicatif    = { version = "0.17" }
+dialoguer    = { version = "0.11" }
+console      = { version = "0.15" }
+ctrlc        = { version = "3.4" }
+
+# Serialization
+serde        = { version = "1", features = ["derive"] }
+serde_json   = { version = "1" }
+
+# Error handling
+anyhow       = { version = "1" }
+thiserror    = { version = "2" }
+
+# Crypto / encryption
+aes-gcm      = { version = "0.10" }
+argon2       = { version = "0.5" }
+rand         = { version = "0.8" }
+zeroize      = { version = "1", features = ["derive"] }
+base64       = { version = "0.22" }
+
+# Time
+time         = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+
+# Process management
+sysinfo      = { version = "0.35", default-features = false, features = ["system"] }
+
+# File locking
+fs4         = { version = "0.12" }
+
+# Tracing / logging
+tracing      = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Testing
+tempfile     = { version = "3" }

@@ -1,0 +1,42 @@
+[package]
+name        = "agyx-core"
+description = "Core library for AGYX multi-account AGY manager (no I/O, no CLI parsing)"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+license.workspace    = true
+rust-version.workspace = true
+
+[features]
+default = []
+mock-adapter = []
+
+[dependencies]
+tokio        = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+anyhow       = { workspace = true }
+thiserror    = { workspace = true }
+aes-gcm      = { workspace = true }
+argon2       = { workspace = true }
+rand         = { workspace = true }
+zeroize      = { workspace = true }
+base64       = { workspace = true }
+time         = { workspace = true }
+sysinfo      = { workspace = true }
+fs4         = { workspace = true }
+tracing      = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security_Credentials",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_ToolHelp",
+] }
+
+[dev-dependencies]
+tokio       = { workspace = true }
+tempfile    = { workspace = true }
+agyx-core   = { path = ".", features = ["mock-adapter"] }
