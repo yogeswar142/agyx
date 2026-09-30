@@ -115,9 +115,29 @@ impl CredentialVault {
         self.flush()
     }
 
-    /// List all profile names in the vault.
+    /// List all user profile names in the vault (excluding internal keys starting with `__`).
     pub fn list_profiles(&self) -> Vec<String> {
-        self.file.entries.keys().cloned().collect()
+        self.file
+            .entries
+            .keys()
+            .filter(|k| !k.starts_with("__"))
+            .cloned()
+            .collect()
+    }
+
+    /// List internal backup keys in the vault (keys starting with `__`).
+    pub fn list_internal_backups(&self) -> Vec<String> {
+        self.file
+            .entries
+            .keys()
+            .filter(|k| k.starts_with("__"))
+            .cloned()
+            .collect()
+    }
+
+    /// Check if the vault contains an entry (including internal backup keys).
+    pub fn contains_entry(&self, key: &str) -> bool {
+        self.file.entries.contains_key(key)
     }
 
     /// Rename a profile entry.

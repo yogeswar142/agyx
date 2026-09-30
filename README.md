@@ -18,7 +18,7 @@ AGYX is a fast, secure, cross-platform CLI tool for switching between multiple l
 4. **Verified Against AGY 1.2.14 on Windows ARM64 Only**:
    > [!IMPORTANT]
    > This release has been verified and tested against `agy` version **1.2.14** running on Windows 11 ARM64 (`aarch64-pc-windows-msvc`, Qualcomm Snapdragon X2).
-   > **macOS and Linux backends are NOT implemented or verified yet.** Discovery on those platforms must be performed before running on macOS or Linux.
+   > **macOS and Linux builds are provided as unverified builds.** Discovery on those platforms must be performed before running on macOS or Linux.
    > If an unknown or newer AGY version is detected, AGYX emits a prominent warning because credential formats and targets are undocumented internal interfaces that could change across AGY releases.
 
 ---
@@ -55,35 +55,65 @@ Tokens (`access_token`, `refresh_token`, `id_token`) are **never printed, logged
 
 ---
 
-## Command Roles
+## Installation & Setup
 
-AGYX maintains a strict separation between registering an already-authenticated account and adding a new one:
-
-| Command | Role | Impact on Live Session |
-|---|---|---|
-| `agyx save <name>` | Registers the **currently logged-in** AGY account as a named profile. | **ZERO IMPACT**. The live credential is never modified, rewritten, or touched. |
-| `agyx login <name>` | Runs AGY's authentication flow to log in to a **NEW** Google account. | Temporarily swaps credentials; restores the prior live account upon completion or interruption. |
-| `agyx switch <name>` | Switches the live AGY session to the named profile. | Replaces `gemini:antigravity` with the stored profile blob. |
-| `agyx current` | Shows who is active right now. | Reads live OS credential (never reads a cached flag). |
-| `agyx restore-original` | Emergency recovery of pre-AGYX credential. | Restores pre-swap backup byte-for-byte. |
-
----
-
-## Installation (Windows ARM64 / x64)
-
-### Build from Source
+### Option 1: Automated Script (`install.ps1`) [Recommended on Windows]
+Run the automated installer script from PowerShell:
 ```powershell
-git clone https://github.com/yogeswar142/agyx.git
-cd agyx
-cargo build --release
+.\install.ps1
 ```
-The compiled self-contained binary is located at `target\release\agyx.exe`.
+- Copies `agyx.exe` to `%LOCALAPPDATA%\Programs\agyx\agyx.exe`.
+- Adds `%LOCALAPPDATA%\Programs\agyx` to the **User PATH** in `HKCU\Environment` without administrator privileges.
+- Preserves the existing `REG_EXPAND_SZ` registry type and avoids the 1024-character truncation of `setx`.
+- Idempotent and broadcasts the environment change to all top-level windows.
+- Open a fresh terminal window after installation to use `agyx` from anywhere.
 
-Add `target\release` to your `PATH`, or copy `agyx.exe` to a folder in your `PATH` (e.g. `C:\Users\<user>\AppData\Local\agy\bin`).
+To uninstall:
+```powershell
+.\uninstall.ps1
+```
+Removes the binary and the exact User PATH entry, leaving your vault, configuration, and credentials untouched. Pass `-PurgeData` if you explicitly want to erase stored profiles after a confirmation prompt.
+
+### Option 2: Cargo Install
+If you have the Rust toolchain installed:
+```powershell
+cargo install --path crates/agyx-cli
+```
+This places `agyx` in `%USERPROFILE%\.cargo\bin`, which is typically already in your `PATH`.
+
+### Option 3: Download Pre-built Release
+Download the archive for your architecture from [GitHub Releases](https://github.com/yogeswar142/agyx/releases):
+- **Windows ARM64**: `agyx-v*-aarch64-pc-windows-msvc.zip` (Verified on Snapdragon X2)
+- **Windows x64**: `agyx-v*-x86_64-pc-windows-msvc.zip`
+- **macOS Apple Silicon**: `agyx-v*-aarch64-apple-darwin-unverified.tar.gz` (Unverified)
+- **Linux x64**: `agyx-v*-x86_64-unknown-linux-gnu-unverified.tar.gz` (Unverified)
+
+Every release includes SHA256 checksums (`.sha256`).
+
+> [!NOTE]
+> Release binaries are currently unsigned. On Windows, Windows SmartScreen may display an "Unknown Publisher" warning upon first launch. Click **More info** -> **Run anyway**.
 
 ---
 
-## Usage Workflow
+## Command Reference
+
+| Command | Description | Example |
+|---|---|---|
+| `agyx save <name>` | Save current AGY account as a named profile without re-login | `agyx save personal` |
+| `agyx login <name>` | Log into a new AGY account via browser and save profile | `agyx login college` |
+| `agyx switch <name>` | Switch the active AGY account to a saved profile | `agyx switch college` |
+| `agyx current` | Inspect and display the active AGY account from OS storage | `agyx current` |
+| `agyx accounts` | List all saved profiles in the vault | `agyx accounts` |
+| `agyx run [-- <args>]` | Launch AGY with the active account, syncing refreshed tokens | `agyx run -- --help` |
+| `agyx rename <old> <new>` | Rename a saved profile | `agyx rename work enterprise` |
+| `agyx remove <name>` | Remove a profile from the vault | `agyx remove old-account` |
+| `agyx restore-original` | Restore the backup made before AGYX first swapped credentials | `agyx restore-original` |
+| `agyx quota` | Check remaining daily/weekly quota for profiles | `agyx quota` |
+| `agyx doctor [--redact]` | Check installation, keyring, vault, and system health | `agyx doctor --redact` |
+
+---
+
+## Quick-Start Workflow
 
 ### 1. Register Your Current Account
 If you are already logged in to your primary Google account in AGY:
@@ -116,11 +146,25 @@ agyx current
 agyx run
 ```
 
-### 5. Quota (Phase 1 Status)
+### 5. Check System Health
 ```powershell
-agyx quota
+agyx doctor
 ```
-Reports `"unknown"` honestly. AGY 1.2.14 does not expose any public CLI command or flag for quota.
+Or with masked emails and shortened paths for bug reports:
+```powershell
+agyx doctor --redact
+```
+
+---
+
+## Recovery Procedures
+
+1. **Automatic Journal Restore**:
+   If an operation (such as `agyx login`) is terminated unexpectedly (e.g. power loss or process kill), the crash-recovery journal ensures that running *any* `agyx` command will detect the interrupted state and restore your prior credential before doing anything else.
+2. **Restore Original Backup**:
+   Run `agyx restore-original` at any time to put back the credential snapshot taken before AGYX ever performed its first credential swap.
+3. **Emergency AGY Re-Login**:
+   If credentials are lost, simply run `agy auth login` directly to re-authenticate cleanly with Google.
 
 ---
 

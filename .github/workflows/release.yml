@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build ${{ matrix.target }}
@@ -24,36 +27,43 @@ jobs:
           - os: macos-14
             target: aarch64-apple-darwin
             binary_name: agyx
-            archive_name: agyx-v${{ github.ref_name }}-aarch64-apple-darwin.tar.gz
+            archive_name: agyx-v${{ github.ref_name }}-aarch64-apple-darwin-unverified.tar.gz
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             binary_name: agyx
-            archive_name: agyx-v${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+            archive_name: agyx-v${{ github.ref_name }}-x86_64-unknown-linux-gnu-unverified.tar.gz
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:
           targets: ${{ matrix.target }}
 
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }} --bin agyx
 
-      - name: Package Windows archive
+      - name: Package Windows archive and checksum
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           Compress-Archive -Path "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" -DestinationPath "${{ matrix.archive_name }}"
+          $hash = (Get-FileHash -Path "${{ matrix.archive_name }}" -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ matrix.archive_name }}" | Out-File -FilePath "${{ matrix.archive_name }}.sha256" -Encoding ascii
 
-      - name: Package Unix archive
+      - name: Package Unix archive and checksum
         if: runner.os != 'Windows'
+        shell: bash
         run: |
           tar -czf "${{ matrix.archive_name }}" -C "target/${{ matrix.target }}/release" "${{ matrix.binary_name }}"
+          sha256sum "${{ matrix.archive_name }}" > "${{ matrix.archive_name }}.sha256"
 
       - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ${{ matrix.archive_name }}
+          files: |
+            ${{ matrix.archive_name }}
+            ${{ matrix.archive_name }}.sha256

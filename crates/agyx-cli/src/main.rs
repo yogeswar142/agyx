@@ -138,7 +138,7 @@ overwrites. Checks the process table and prompts if AGY is running.",
 Launches AGY with the active account (or switches to a specified account first), \
 passing through stdin, stdout, and exit codes. Automatically syncs any refreshed \
 tokens back to the vault after AGY exits (only if sub matches).",
-        after_help = "EXAMPLES:\n  agyx run\n  agyx run --account college\n  agyx run -- --prompt \"Explain this code\"\n  agyx run -a personal -- models"
+        after_help = "EXAMPLES:\n  agyx run\n  agyx run --account college\n  agyx run -- <agy args>\n  agyx run -a personal -- <agy args>"
     )]
     Run {
         /// Switch to this profile before launching.
@@ -155,10 +155,15 @@ tokens back to the vault after AGY exits (only if sub matches).",
         long_about = "\
 Runs comprehensive health checks on AGY installation, version compatibility, \
 Windows Credential Manager access, vault encryption, recovery journal, file locking, \
-and PATH setup. Never prints secrets.",
-        after_help = "EXAMPLES:\n  agyx doctor"
+and PATH setup. Never prints secrets.\n\n\
+Use --redact to mask emails and shorten filesystem paths for safe bug reporting.",
+        after_help = "EXAMPLES:\n  agyx doctor\n  agyx doctor --redact"
     )]
-    Doctor,
+    Doctor {
+        /// Mask email addresses, subject IDs, and shorten file paths for safe sharing.
+        #[arg(long)]
+        redact: bool,
+    },
 
     /// Rename a profile.
     #[command(
@@ -259,7 +264,7 @@ fn dispatch(cli: Cli) -> anyhow::Result<()> {
         Commands::Current => commands::current::run(),
         Commands::Switch { name } => commands::switch::run(&name),
         Commands::Run { account, args } => commands::run_agy::run(account.as_deref(), &args),
-        Commands::Doctor => commands::doctor::run(),
+        Commands::Doctor { redact } => commands::doctor::run(redact),
         Commands::Rename { old, new } => commands::rename::run(&old, &new),
         Commands::Remove { name } => commands::remove::run(&name),
         Commands::RestoreOriginal => commands::restore::run(),

@@ -4,12 +4,16 @@ use agyx_core::{
 };
 use console::style;
 
-pub fn run() -> anyhow::Result<()> {
-    println!("{}", style("AGYX System Doctor").bold().cyan());
+pub fn run(redact: bool) -> anyhow::Result<()> {
+    if redact {
+        println!("{} (Redacted mode)", style("AGYX System Doctor").bold().cyan());
+    } else {
+        println!("{}", style("AGYX System Doctor").bold().cyan());
+    }
     println!("─────────────────────────────────────────────────────────────────────────────");
 
     let adapter = RealAgyAdapter::new()?;
-    let report = run_doctor(&adapter);
+    let report = run_doctor(&adapter, redact);
 
     for check in &report.checks {
         let badge = match check.status {
