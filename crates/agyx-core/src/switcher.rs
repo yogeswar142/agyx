@@ -198,15 +198,16 @@ impl Switcher {
     ///    ├─ 4. Read current credential A (raw bytes)
     ///    ├─ 5. Refuse if A is unsaved in AGYX (unless explicitly confirmed)
     ///    ├─ 6. Write recovery journal BEFORE touching live credentials
-    ///    ├─ 7. Run AGY login flow → user authenticates B
-    ///    ├─ 8. Read new credential B (raw bytes)
-    ///    ├─ 9. Extract sub from B (read-only copy)
-    ///    ├─ 10. Reject if sub(B) == sub(A) or sub(B) already registered
-    ///    ├─ 11. Save B encrypted under <name>
-    ///    ├─ 12. Save profile metadata (sub, email) in config
-    ///    ├─ 13. Restore A byte-for-byte (or delete if none before)
-    ///    ├─ 14. Verify live sub == sub(A) again
-    ///    ├─ 15. Remove recovery journal
+    ///    ├─ 7. Clear live credential temporarily so AGY triggers login prompt
+    ///    ├─ 8. Run AGY login flow → user authenticates B
+    ///    ├─ 9. Read new credential B (raw bytes)
+    ///    ├─ 10. Extract sub from B (read-only copy)
+    ///    ├─ 11. Reject if sub(B) == sub(A) or sub(B) already registered
+    ///    ├─ 12. Save B encrypted under <name>
+    ///    ├─ 13. Save profile metadata (sub, email) in config
+    ///    ├─ 14. Restore A byte-for-byte (or delete if none before)
+    ///    ├─ 15. Verify live sub == sub(A) again
+    ///    ├─ 16. Remove recovery journal
     ///    └─ [Done]
     ///
     /// On any failure at steps 7–14: → ROLLBACK: restore A
@@ -341,19 +342,30 @@ impl Switcher {
         cfg: &mut AgyxConfig,
         vault: &mut CredentialVault,
     ) -> Result<LoginResult, AgyxError> {
-        // ── Step 6: Run AGY login flow ────────────────────────────────────────
+        // ── Step 7: Clear live credential temporarily so AGY triggers login prompt
+        if credential_a.is_some() {
+            self.adapter.delete_credential().or_else(|e| {
+                if matches!(e, AgyxError::OsCredentialError(_)) {
+                    Ok(())
+                } else {
+                    Err(e)
+                }
+            })?;
+        }
+
+        // ── Step 8: Run AGY login flow ────────────────────────────────────────
         self.adapter.run_login_flow()?;
 
-        // ── Step 7: Read new credential B ─────────────────────────────────────
+        // ── Step 9: Read new credential B ─────────────────────────────────────
         let credential_b = self
             .adapter
             .read_credential()?
-            .ok_or(AgyxError::LoginNoChange)?;
+            .ok_or(AgyxError::LoginCancelled)?;
 
-        // ── Step 8: Extract identity from B (read-only, not stored) ──────────
+        // ── Step 10: Extract identity from B (read-only, not stored) ──────────
         let identity_b = extract_identity(&credential_b)?;
 
-        // ── Step 9: Reject if unchanged or already registered ─────────────────
+        // ── Step 11: Reject if unchanged or already registered ─────────────────
         if let Some(a) = identity_a {
             if a.sub == identity_b.sub {
                 return Err(AgyxError::LoginNoChange);

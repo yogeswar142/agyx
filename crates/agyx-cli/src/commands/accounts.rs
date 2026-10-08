@@ -11,10 +11,17 @@ pub fn run() -> anyhow::Result<()> {
     let active_sub = current.as_ref().map(|c| c.sub.as_str());
 
     if accounts.is_empty() {
-        println!(
-            "No profiles registered. Run {} to add one.",
-            style("agyx login <name>").bold()
-        );
+        if current.is_some() {
+            println!(
+                "No profiles registered. Run {} to register your current account.",
+                style("agyx save <name>").bold()
+            );
+        } else {
+            println!(
+                "No profiles registered. Run {} to authenticate and add one.",
+                style("agyx login <name>").bold()
+            );
+        }
         return Ok(());
     }
 
@@ -30,6 +37,10 @@ pub fn run() -> anyhow::Result<()> {
         if live.profile.is_none() {
             print_warning(
                 "The currently active AGY account is not registered with AGYX.",
+            );
+            println!(
+                "  Run {} to save it as a profile.",
+                style("agyx save <name>").bold()
             );
         }
     }

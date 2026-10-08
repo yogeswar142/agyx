@@ -257,16 +257,21 @@ pub mod agt {
     }
 
     /// Delete AGY's `gemini:antigravity` credential entry.
-    /// Used to restore the "no credential" state when the user had none before.
+    /// Used to restore the "no credential" state when the user had none before,
+    /// or temporarily clear the active credential during `login`.
     pub fn delete() -> Result<(), AgyxError> {
         let tw = target_wide();
         unsafe {
-            CredDeleteW(PWSTR(tw.as_ptr() as *mut u16), CRED_TYPE_GENERIC, Some(0))
-                .map_err(|e| {
-                    AgyxError::OsCredentialError(format!(
-                        "CredDeleteW on 'gemini:antigravity' failed: {e}"
-                    ))
-                })?;
+            let res = CredDeleteW(PWSTR(tw.as_ptr() as *mut u16), CRED_TYPE_GENERIC, Some(0));
+            if res.is_err() {
+                let err = windows::Win32::Foundation::GetLastError();
+                if err == ERROR_NOT_FOUND {
+                    return Ok(());
+                }
+                return Err(AgyxError::OsCredentialError(format!(
+                    "CredDeleteW on 'gemini:antigravity' failed: {err:?}"
+                )));
+            }
         }
         Ok(())
     }

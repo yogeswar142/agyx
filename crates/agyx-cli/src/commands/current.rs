@@ -24,7 +24,7 @@ pub fn run() -> anyhow::Result<()> {
                     print_field("Profile:", "UNKNOWN");
                     println!();
                     print_warning("This account is not registered with AGYX.");
-                    println!("  Run {} to register it.", style(format!("agyx login <name>")).bold());
+                    println!("  Run {} to register it.", style("agyx save <name>").bold());
                 }
             }
         }

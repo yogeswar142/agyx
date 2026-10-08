@@ -295,3 +295,77 @@ fn test_blob_over_windows_limit_fails_loudly() {
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. Login flow tests: success saves new profile and restores original,
+//    same account is rejected, cancelled login restores original.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_login_success_saves_new_profile_and_restores_original() {
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![]));
+    let blob_a = make_blob("sub_user_login_a", "user_login_a@gmail.com");
+    let blob_b = make_blob("sub_user_login_b", "user_login_b@gmail.com");
+
+    let adapter = MockAgyAdapter::new();
+    adapter.set_credential(Some(blob_a.clone()));
+    adapter.set_login_result(blob_b.clone());
+
+    let switcher = Switcher::new(Box::new(adapter));
+
+    let res = switcher.login("login_profile_b", true).expect("login succeeds");
+    assert_eq!(res.profile, "login_profile_b");
+    assert_eq!(res.email, "user_login_b@gmail.com");
+    assert_eq!(res.sub, "sub_user_login_b");
+
+    // Live credential must be restored to blob_a!
+    let live = switcher.current().unwrap().unwrap();
+    assert_eq!(live.sub, "sub_user_login_a");
+    assert_eq!(live.email, "user_login_a@gmail.com");
+
+    // Profile B must be in vault
+    let vault = CredentialVault::open().unwrap();
+    let loaded_b = vault.load("login_profile_b").unwrap();
+    assert_eq!(loaded_b, blob_b);
+
+    // Clean up
+    let _ = switcher.remove("login_profile_b");
+    agyx_core::process_manager::set_mock_running_pids(None);
+}
+
+#[test]
+fn test_login_rejects_same_account() {
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![]));
+    let blob_a = make_blob("sub_same_account", "same_account@gmail.com");
+    let adapter = MockAgyAdapter::new();
+    adapter.set_credential(Some(blob_a.clone()));
+    adapter.set_login_result(blob_a.clone());
+
+    let switcher = Switcher::new(Box::new(adapter));
+    let err = switcher.login("profile_dup", true).unwrap_err();
+    assert!(matches!(err, AgyxError::LoginNoChange));
+
+    // Live credential must remain blob_a
+    let live = switcher.current().unwrap().unwrap();
+    assert_eq!(live.sub, "sub_same_account");
+    agyx_core::process_manager::set_mock_running_pids(None);
+}
+
+#[test]
+fn test_login_cancelled_restores_original() {
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![]));
+    let blob_a = make_blob("sub_cancel_keep", "cancel_keep@gmail.com");
+    let adapter = MockAgyAdapter::new();
+    adapter.set_credential(Some(blob_a.clone()));
+    // Do not set login result, so credential becomes None after delete
+
+    let switcher = Switcher::new(Box::new(adapter));
+    let err = switcher.login("profile_cancelled", true).unwrap_err();
+    assert!(matches!(err, AgyxError::LoginCancelled));
+
+    // Live credential must be restored to blob_a
+    let live = switcher.current().unwrap().unwrap();
+    assert_eq!(live.sub, "sub_cancel_keep");
+    agyx_core::process_manager::set_mock_running_pids(None);
+}
+

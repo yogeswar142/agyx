@@ -140,11 +140,18 @@ pub fn run(name: &str) -> anyhow::Result<()> {
             active.store(false, Ordering::SeqCst);
             print_login_success(&result);
         }
+        Err(AgyxError::LoginCancelled) => {
+            active.store(false, Ordering::SeqCst);
+            anyhow::bail!(
+                "No AGY credential was found after the login flow. \
+                 Did you complete authentication in the browser and close AGY?"
+            );
+        }
         Err(AgyxError::LoginNoChange) => {
             active.store(false, Ordering::SeqCst);
             anyhow::bail!(
-                "The AGY credential was not changed after the login flow. \
-                 Did you log in as a different account and close AGY?"
+                "The authenticated account matches your previously active account. \
+                 To add an additional account, log in with a different Google account."
             );
         }
         Err(AgyxError::AccountAlreadyRegistered { sub, profile }) => {

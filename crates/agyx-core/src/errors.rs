@@ -46,6 +46,10 @@ pub enum AgyxError {
     #[error("The authenticated account (sub: {sub}) is already registered as profile '{profile}'. Did you log in to the same account twice?")]
     AccountAlreadyRegistered { sub: String, profile: String },
 
+    /// The login flow did not produce a credential (user cancelled or closed AGY before authenticating).
+    #[error("No credential was created after the login flow. Did you complete authentication in the browser?")]
+    LoginCancelled,
+
     /// The login flow did not change the credential (login did not complete).
     #[error("The AGY credential was not changed after login. The login flow may not have completed successfully.")]
     LoginNoChange,

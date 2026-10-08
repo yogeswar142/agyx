@@ -112,10 +112,11 @@ Google subs, and which profile is currently active in the OS credential store.",
 
     /// Show the currently active AGY account (reads live OS credential).
     #[command(
+        alias = "status",
         long_about = "\
 Inspects the live OS credential (gemini:antigravity) as the sole source of truth and \
 reports the active account identity. Never assumes or trusts a cached 'active profile' flag.",
-        after_help = "EXAMPLES:\n  agyx current"
+        after_help = "EXAMPLES:\n  agyx current\n  agyx status"
     )]
     Current,
 
