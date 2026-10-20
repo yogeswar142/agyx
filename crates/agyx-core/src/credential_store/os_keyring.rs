@@ -48,7 +48,7 @@ mod windows_impl {
     use windows::Win32::Foundation::ERROR_NOT_FOUND;
     use windows::Win32::Security::Credentials::{
         CredFree, CredReadW, CredWriteW,
-        CREDENTIAL_ATTRIBUTEW, CREDENTIALW, CRED_FLAGS, CRED_PERSIST_LOCAL_MACHINE,
+        CREDENTIALW, CRED_FLAGS, CRED_PERSIST_LOCAL_MACHINE,
         CRED_TYPE_GENERIC,
     };
     use windows::core::PWSTR;
@@ -127,7 +127,7 @@ mod windows_impl {
                 CredentialBlob: blob_bytes.as_ptr() as *mut u8,
                 Persist: CRED_PERSIST_LOCAL_MACHINE,
                 AttributeCount: 0,
-                Attributes: std::ptr::null_mut() as *mut CREDENTIAL_ATTRIBUTEW,
+                Attributes: std::ptr::null_mut(),
                 TargetAlias: PWSTR::null(),
                 UserName: PWSTR(user_wide.as_ptr() as *mut u16),
             };
@@ -157,7 +157,7 @@ fn os_write_vault_key(key: &[u8; 32]) -> Result<(), AgyxError> {
 
 /// The target name AGY uses in Windows Credential Manager.
 ///
-/// **UNDOCUMENTED INTERFACE** — discovered by binary inspection of agy.exe v1.2.14.
+/// **UNDOCUMENTED INTERFACE** — discovered by binary inspection of agy.exe v1.2.14 and verified through v1.3.2.
 pub const AGY_TARGET: &str = "gemini:antigravity";
 
 /// The upper size limit for a Windows Credential Manager generic credential blob.
@@ -174,7 +174,7 @@ pub mod agt {
     use windows::Win32::Foundation::ERROR_NOT_FOUND;
     use windows::Win32::Security::Credentials::{
         CredDeleteW, CredFree, CredReadW, CredWriteW,
-        CREDENTIAL_ATTRIBUTEW, CREDENTIALW, CRED_FLAGS, CRED_PERSIST_LOCAL_MACHINE,
+        CREDENTIALW, CRED_FLAGS, CRED_PERSIST_LOCAL_MACHINE,
         CRED_TYPE_GENERIC,
     };
     use windows::core::PWSTR;
@@ -243,7 +243,7 @@ pub mod agt {
                 CredentialBlob: blob.as_ptr() as *mut u8,
                 Persist: CRED_PERSIST_LOCAL_MACHINE,
                 AttributeCount: 0,
-                Attributes: std::ptr::null_mut() as *mut CREDENTIAL_ATTRIBUTEW,
+                Attributes: std::ptr::null_mut(),
                 TargetAlias: PWSTR::null(),
                 UserName: PWSTR(user_wide.as_ptr() as *mut u16),
             };
@@ -361,7 +361,7 @@ mod tests {
                 CredentialBlob: test_payload.as_ptr() as *mut u8,
                 Persist: CRED_PERSIST_LOCAL_MACHINE,
                 AttributeCount: 0,
-                Attributes: std::ptr::null_mut() as *mut CREDENTIAL_ATTRIBUTEW,
+                Attributes: std::ptr::null_mut(),
                 TargetAlias: PWSTR::null(),
                 UserName: PWSTR(user_wide.as_ptr() as *mut u16),
             };

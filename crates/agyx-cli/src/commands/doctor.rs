@@ -29,23 +29,20 @@ pub fn run(redact: bool) -> anyhow::Result<()> {
     match report.overall_status {
         CheckStatus::Pass => {
             println!(
-                "{} {}",
-                style("✓ All checks passed.").green().bold(),
-                "Your AGYX environment is healthy and ready to use."
+                "{} Your AGYX environment is healthy and ready to use.",
+                style("✓ All checks passed.").green().bold()
             );
         }
         CheckStatus::Warn => {
             println!(
-                "{} {}",
-                style("▲ System operational with warnings.").yellow().bold(),
-                "Review the warning messages above."
+                "{} Review the warning messages above.",
+                style("▲ System operational with warnings.").yellow().bold()
             );
         }
         CheckStatus::Fail => {
             println!(
-                "{} {}",
-                style("✗ One or more critical checks failed.").red().bold(),
-                "Fix the failed components above before continuing."
+                "{} Fix the failed components above before continuing.",
+                style("✗ One or more critical checks failed.").red().bold()
             );
         }
     }

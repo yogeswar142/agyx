@@ -17,9 +17,9 @@ pub fn run(name: &str) -> anyhow::Result<()> {
         let detection = adapter.detect()?;
         if !detection.version_matches {
             print_warning(&format!(
-                "AGY version {} is not the tested version ({}). Proceed with caution.",
+                "AGY version {} is not among tested versions ({}). Proceed with caution.",
                 detection.version,
-                agyx_core::adapter::SUPPORTED_AGY_VERSION
+                agyx_core::adapter::SUPPORTED_AGY_VERSIONS.join(", ")
             ));
         }
     }
@@ -40,6 +40,15 @@ pub fn run(name: &str) -> anyhow::Result<()> {
             .interact()?;
         if !restart {
             anyhow::bail!("Login cancelled.");
+        }
+        let terminated = agyx_core::process_manager::terminate_agy_processes()?;
+        if !terminated.is_empty() {
+            println!(
+                "{} Closed running AGY process{}: {:?}.",
+                style("✓").green().bold(),
+                if terminated.len() > 1 { "es" } else { "" },
+                terminated
+            );
         }
         if !find_agy_pids().is_empty() {
             anyhow::bail!(
@@ -112,7 +121,7 @@ pub fn run(name: &str) -> anyhow::Result<()> {
             eprintln!("  Sub:   {}", cur.sub);
             eprintln!();
             eprintln!("To preserve this account permanently before logging in to another, run:");
-            eprintln!("  {}", style(format!("agyx save <profile-name>")).cyan().bold());
+            eprintln!("  {}", style("agyx save <profile-name>").cyan().bold());
             eprintln!();
             let proceed = Confirm::new()
                 .with_prompt("Do you want to proceed without saving this account first?")

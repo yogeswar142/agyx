@@ -18,8 +18,16 @@
 
 use crate::AgyxError;
 
-/// The only AGY version this implementation has been validated against.
-pub const SUPPORTED_AGY_VERSION: &str = "1.2.14";
+/// The AGY versions this implementation has been validated against.
+pub const SUPPORTED_AGY_VERSIONS: &[&str] = &["1.2.14", "1.3.2", "1.4.3"];
+
+/// The latest AGY version this implementation has been validated against.
+pub const SUPPORTED_AGY_VERSION: &str = "1.4.3";
+
+/// Check if a given AGY version string matches any verified version.
+pub fn is_supported_version(version: &str) -> bool {
+    SUPPORTED_AGY_VERSIONS.contains(&version)
+}
 
 /// The Windows Credential Manager target for AGY's credential.
 ///
@@ -101,12 +109,13 @@ impl AgyAdapter for RealAgyAdapter {
             .map_err(|e| AgyxError::internal(format!("Failed to run agy --version: {e}")))?;
 
         let version = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-        let version_matches = version == SUPPORTED_AGY_VERSION;
+        let version_matches = is_supported_version(&version);
 
         if !version_matches {
             tracing::warn!(
-                "AGY version mismatch: expected {SUPPORTED_AGY_VERSION}, found '{version}'. \
-                 AGYX may not work correctly."
+                "AGY version mismatch: expected one of {:?}, found '{version}'. \
+                 AGYX may not work correctly.",
+                SUPPORTED_AGY_VERSIONS
             );
         }
 
@@ -158,10 +167,28 @@ impl AgyAdapter for RealAgyAdapter {
     }
 
     fn launch(&self, args: &[String]) -> Result<std::process::ExitStatus, AgyxError> {
-        let status = std::process::Command::new(&self.exe_path)
+        let profile_name = self.read_credential().ok().flatten().and_then(|blob| {
+            crate::identity::extract_identity(&blob).ok().and_then(|id| {
+                crate::config::load_config().ok().and_then(|cfg| {
+                    cfg.profiles.into_iter().find(|(_, meta)| meta.sub == id.sub).map(|(name, _)| name)
+                })
+            })
+        });
+
+        let mut child = std::process::Command::new(&self.exe_path)
             .args(args)
-            .status()
+            .spawn()
             .map_err(|e| AgyxError::internal(format!("Failed to launch agy: {e}")))?;
+
+        let pid = child.id();
+        let _ = crate::sessions::record_session(pid, profile_name.as_deref().unwrap_or("active"));
+
+        let status = child
+            .wait()
+            .map_err(|e| AgyxError::internal(format!("Failed waiting for agy process: {e}")))?;
+
+        let _ = crate::sessions::remove_session(pid);
+
         Ok(status)
     }
 
@@ -260,7 +287,7 @@ pub mod mock {
 
     impl AgyAdapter for MockAgyAdapter {
         fn detect(&self) -> Result<AgyDetection, AgyxError> {
-            let version_matches = self.version == SUPPORTED_AGY_VERSION;
+            let version_matches = is_supported_version(&self.version);
             Ok(AgyDetection {
                 exe_path: std::path::PathBuf::from("/mock/agy"),
                 version: self.version.clone(),
@@ -309,5 +336,21 @@ pub mod mock {
             }
             Ok(())
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_supported_versions() {
+        assert!(is_supported_version("1.2.14"));
+        assert!(is_supported_version("1.3.2"));
+        assert!(is_supported_version("1.4.3"));
+        assert!(!is_supported_version("1.0.0"));
+        assert!(!is_supported_version("2.0.0"));
+        assert_eq!(SUPPORTED_AGY_VERSION, "1.4.3");
     }
 }

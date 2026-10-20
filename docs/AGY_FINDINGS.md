@@ -1,8 +1,8 @@
 # AGY Discovery Findings & Credential Strategy Report
 
-**Inspection Date**: 2026-09-30  
+**Inspection Dates**: 2026-09-30 (v1.2.14), 2026-10-09 (v1.3.2), 2026-10-20 (v1.4.3)  
 **Host Platform**: Windows 11 ARM64 (`aarch64-pc-windows-msvc`, Qualcomm Snapdragon X2)  
-**AGY Version Inspected**: 1.2.14  
+**AGY Versions Inspected & Verified**: 1.2.14, 1.3.2, 1.4.3  
 **Primary Executable**: `%LOCALAPPDATA%\agy\bin\agy.exe`  
 
 ---
@@ -10,14 +10,14 @@
 ## 1. Executable Name, Location, and Version Command
 
 - **Finding**: The installed AGY CLI binary is `agy.exe` located at `%LOCALAPPDATA%\agy\bin\agy.exe`.
-- **Version Command**: `agy --version` returns `1.2.14`.
+- **Version Command**: `agy --version` returns `1.2.14` or `1.3.2`.
 - **Status**: **VERIFIED**
 - **Evidence**:
   ```powershell
   Get-Command agy | Format-List Source
   # Output: Source : ...\AppData\Local\agy\bin\agy.exe
   agy --version
-  # Output: 1.2.14
+  # Output: 1.4.3
   ```
 
 ---
@@ -66,13 +66,16 @@
 
 ---
 
-## 6. Behavior When Credentials Change During Run & Process Detection
+## 6. Multi-Terminal Concurrency & Process Behavior
 
 - **Finding**:
   - **Process Detection**: Running AGY instances on Windows can be detected reliably by enumerating processes named `agy.exe`.
-  - **Credential Change Mid-Session**: If credentials in Windows Credential Manager are overwritten while `agy.exe` is running, AGY holds token state in memory and can asynchronously overwrite the new credential on token refresh, causing corruption.
-  - **Requirement**: AGYX must enforce a strict guard: if AGY is currently running, switching accounts must require confirmation to stop AGY.
-- **Status**: **VERIFIED**
+  - **In-Memory Token Lifecycle**: AGY reads the OS credential (`gemini:antigravity`) once during process startup and keeps the OAuth token in memory for all session turns. Subsequent tool calls and interactions do NOT repeatedly re-read the OS credential store.
+  - **Same Account in Multiple Terminals**: Multiple terminals running the same account can execute concurrently with zero conflict. Neither process alters credentials unless a token refresh occurs, at which point both processes refresh and persist identical account tokens.
+  - **Different Accounts in Multiple Terminals via `agyx start <name>`**:
+    By preparing the OS store with `<name>` prior to spawning `agy.exe`, the new terminal reads `<name>` into its memory space. Concurrently running terminals continue using their already-loaded in-memory credentials without disruption.
+  - **Post-Run Vault Safety**: AGYX's post-run token sync-back verifies Google `sub` identity before saving any refreshed token into the vault. Even if another terminal refreshes in the background, vault integrity is strictly preserved.
+- **Status**: **VERIFIED (AGY 1.2.14, 1.3.2, 1.4.3)**
 
 ---
 

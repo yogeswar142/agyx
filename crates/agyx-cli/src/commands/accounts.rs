@@ -30,6 +30,11 @@ pub fn run() -> anyhow::Result<()> {
     for acc in &accounts {
         let is_active = active_sub.map(|s| s == acc.sub).unwrap_or(false);
         print_account_block(&acc.name, &acc.email, &acc.sub, is_active);
+        let sessions = agyx_core::sessions::sessions_for_profile(&acc.name);
+        if !sessions.is_empty() {
+            let pids: Vec<String> = sessions.iter().map(|s| format!("PID {}", s.pid)).collect();
+            println!("    Sessions: {} active terminal(s) ({})", sessions.len(), pids.join(", "));
+        }
         println!();
     }
 

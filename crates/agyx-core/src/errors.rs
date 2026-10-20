@@ -11,7 +11,7 @@ pub enum AgyxError {
     AgyNotFound,
 
     /// The `agy --version` output did not match the expected supported version.
-    /// AGYX has only been tested against 1.2.14 on Windows ARM64.
+    /// AGYX has been tested against 1.2.14 and 1.3.2 on Windows ARM64.
     #[error("AGY version mismatch: expected {expected}, found {found}. AGYX may not work correctly with this version.")]
     AgyVersionMismatch { expected: String, found: String },
 

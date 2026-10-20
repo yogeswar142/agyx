@@ -19,6 +19,7 @@ pub mod identity;
 pub mod journal;
 pub mod lock;
 pub mod process_manager;
+pub mod sessions;
 pub mod switcher;
 
 pub use errors::AgyxError;

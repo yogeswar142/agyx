@@ -1,5 +1,5 @@
 use crate::output::print_warning;
-use agyx_core::adapter::{AgyAdapter, RealAgyAdapter, SUPPORTED_AGY_VERSION};
+use agyx_core::adapter::{AgyAdapter, RealAgyAdapter, SUPPORTED_AGY_VERSIONS};
 use console::style;
 
 pub fn run() -> anyhow::Result<()> {
@@ -10,7 +10,7 @@ pub fn run() -> anyhow::Result<()> {
     println!("─────────────────────────────────────────────");
     println!("  AGYX version:     {}", env!("CARGO_PKG_VERSION"));
     println!("  AGY version:      {}", detection.version);
-    println!("  Tested against:   {}", SUPPORTED_AGY_VERSION);
+    println!("  Tested against:   {}", SUPPORTED_AGY_VERSIONS.join(", "));
     println!("  AGY path:         {}", detection.exe_path.display());
     println!("  Platform:         {}", std::env::consts::OS);
     println!("  Architecture:     {}", std::env::consts::ARCH);
@@ -19,9 +19,11 @@ pub fn run() -> anyhow::Result<()> {
         println!();
         print_warning(&format!(
             "AGY version {} has not been tested with this build of AGYX.\n  \
+             Tested versions: {}\n  \
              Credential format changes in newer versions could cause issues.\n  \
              Proceed carefully and report any problems.",
-            detection.version
+            detection.version,
+            SUPPORTED_AGY_VERSIONS.join(", ")
         ));
     } else {
         println!();

@@ -27,6 +27,15 @@ pub fn run() -> anyhow::Result<()> {
                     println!("  Run {} to register it.", style("agyx save <name>").bold());
                 }
             }
+
+            let sessions = agyx_core::sessions::load_active_sessions().unwrap_or_default();
+            if !sessions.is_empty() {
+                println!();
+                println!("{}", style("Running Terminal Sessions").bold());
+                for s in sessions {
+                    println!("  PID {:<7} Profile: {:<12} Started: {}", s.pid, s.profile, s.started_at);
+                }
+            }
         }
     }
 

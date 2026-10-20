@@ -63,8 +63,10 @@ pub fn run_doctor(adapter: &dyn AgyAdapter, redact: bool) -> DoctorReport {
                     name: "AGY Executable".into(),
                     status: CheckStatus::Warn,
                     message: format!(
-                        "Found AGY {} at {} (Tested against 1.2.14; newer/older versions may use different credential formats)",
-                        detection.version, path_disp
+                        "Found AGY {} at {} (Tested against {}; newer/older versions may use different credential formats)",
+                        detection.version,
+                        path_disp,
+                        crate::adapter::SUPPORTED_AGY_VERSIONS.join(", ")
                     ),
                 });
             }
@@ -330,7 +332,41 @@ pub fn run_doctor(adapter: &dyn AgyAdapter, redact: bool) -> DoctorReport {
         }
     }
 
-    // 9. PATH Check
+    // 9. Active Terminal Sessions
+    match crate::sessions::load_active_sessions() {
+        Ok(sessions) => {
+            if sessions.is_empty() {
+                checks.push(DoctorCheck {
+                    name: "Terminal Sessions".into(),
+                    status: CheckStatus::Pass,
+                    message: "No active AGY terminal sessions currently running".into(),
+                });
+            } else {
+                let pids: Vec<String> = sessions
+                    .iter()
+                    .map(|s| format!("PID {} ({})", s.pid, s.profile))
+                    .collect();
+                checks.push(DoctorCheck {
+                    name: "Terminal Sessions".into(),
+                    status: CheckStatus::Pass,
+                    message: format!(
+                        "{} active AGY terminal session(s) running: {}",
+                        sessions.len(),
+                        pids.join(", ")
+                    ),
+                });
+            }
+        }
+        Err(e) => {
+            checks.push(DoctorCheck {
+                name: "Terminal Sessions".into(),
+                status: CheckStatus::Warn,
+                message: format!("Could not inspect active terminal sessions: {e}"),
+            });
+        }
+    }
+
+    // 10. PATH Check
     match check_path_install() {
         PathCheckResult::InPath(path) => {
             let path_disp = if redact { redact_path(&path) } else { path.display().to_string() };
@@ -467,6 +503,16 @@ mod tests {
         assert!(!report.checks.is_empty());
         let agy_check = report.checks.iter().find(|c| c.name == "AGY Executable").unwrap();
         assert_eq!(agy_check.status, CheckStatus::Pass);
+    }
+
+    #[test]
+    fn doctor_warns_on_unsupported_version() {
+        let mut adapter = MockAgyAdapter::new();
+        adapter.version = "99.9.9".to_string();
+        let report = run_doctor(&adapter, false);
+        let agy_check = report.checks.iter().find(|c| c.name == "AGY Executable").unwrap();
+        assert_eq!(agy_check.status, CheckStatus::Warn);
+        assert!(agy_check.message.contains("Tested against 1.2.14, 1.3.2, 1.4.3"));
     }
 
     #[test]

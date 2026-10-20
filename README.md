@@ -13,11 +13,13 @@ AGYX is a fast, secure, cross-platform CLI tool for switching between multiple l
    - **Linux**: Secret Service (D-Bus) under service `gemini`, account `antigravity` (*Not yet verified*).
 2. **AGYX Reads the Live Credential as Source of Truth**:
    AGYX **never assumes** or trusts a local "active profile" flag. Running `agyx current` directly inspects the live credential in the OS credential store and extracts the active account's identity.
-3. **AGY Must Be Closed to Switch**:
-   AGY holds token state in memory and asynchronously syncs refreshed credentials back to the OS store. To prevent data corruption, race conditions, or session pollution, **AGY must be closed before switching accounts**. AGYX checks the process table and will refuse to switch while `agy.exe` is running (unless restart is confirmed).
-4. **Verified Against AGY 1.2.14 on Windows ARM64 Only**:
+3. **Multi-Terminal Support & In-Memory Token Isolation**:
+   - **Same Account Across Multiple Terminals**: Multiple terminals can run the same account simultaneously using `agyx start <name>` or `agyx run` without errors or session conflicts.
+   - **Different Accounts Across Terminals via `agyx start <name>`**: When you run `agyx start <name>`, AGYX safely prepares the credentials for that session. AGY loads the account into its process memory upon startup. Running terminals continue operating independently with their loaded credentials in memory.
+   - **Switch vs Start**: Use `agyx switch <name>` to change the system-wide default account for subsequent native `agy` invocations. Use `agyx start <name>` to launch an account in a specific terminal without needing to terminate existing terminal sessions.
+4. **Verified Against AGY 1.2.14, 1.3.2, and 1.4.3 on Windows ARM64**:
    > [!IMPORTANT]
-   > This release has been verified and tested against `agy` version **1.2.14** running on Windows 11 ARM64 (`aarch64-pc-windows-msvc`, Qualcomm Snapdragon X2).
+   > This release has been verified and tested against `agy` versions **1.2.14**, **1.3.2**, and **1.4.3** running on Windows 11 ARM64 (`aarch64-pc-windows-msvc`, Qualcomm Snapdragon X2).
    > **macOS and Linux builds are provided as unverified builds.** Discovery on those platforms must be performed before running on macOS or Linux.
    > If an unknown or newer AGY version is detected, AGYX emits a prominent warning because credential formats and targets are undocumented internal interfaces that could change across AGY releases.
 
@@ -103,8 +105,10 @@ Every release includes SHA256 checksums (`.sha256`).
 | `agyx login <name>` | Log into a new AGY account via browser and save profile | `agyx login college` |
 | `agyx switch <name>` | Switch the active AGY account to a saved profile | `agyx switch college` |
 | `agyx current` | Inspect and display the active AGY account from OS storage | `agyx current` |
-| `agyx accounts` | List all saved profiles in the vault | `agyx accounts` |
-| `agyx run [-- <args>]` | Launch AGY with the active account, syncing refreshed tokens | `agyx run -- --help` |
+| `agyx accounts` | List all saved profiles and active terminal sessions | `agyx accounts` |
+| `agyx start <name> [-- <args>]` | Start an AGY terminal session with a specific account | `agyx start college` |
+| `agyx stop [name]` | Terminate running AGY sessions (all or for a specific profile) | `agyx stop college` |
+| `agyx run [-a <name>] [-- <args>]` | Launch AGY with active or specified profile | `agyx run -a personal` |
 | `agyx rename <old> <new>` | Rename a saved profile | `agyx rename work enterprise` |
 | `agyx remove <name>` | Remove a profile from the vault | `agyx remove old-account` |
 | `agyx restore-original` | Restore the backup made before AGYX first swapped credentials | `agyx restore-original` |
@@ -134,16 +138,26 @@ agyx login college
 ```
 AGYX launches AGY's login flow. Complete the Google login in your browser for your second account. When finished and you exit AGY, AGYX saves the new account as `college` and restores your `personal` account.
 
-### 4. Switch Accounts
+### 4. Launch Multiple Terminals & Accounts
+You can run multiple terminals with the **same account** or **different accounts** at the same time:
+
 ```powershell
-# Switch to college
-agyx switch college
+# In Terminal 1: Launch personal account
+agyx start personal
 
-# Verify active account
-agyx current
+# In Terminal 2: Launch college account concurrently (no conflicts, no process killing!)
+agyx start college
 
-# Launch AGY with the active account
-agyx run
+# In Terminal 3: Launch personal account again
+agyx start personal
+
+# See which terminals are running which accounts:
+agyx accounts
+```
+
+To switch the system-wide default account for native `agy` commands:
+```powershell
+agyx switch personal
 ```
 
 ### 5. Check System Health

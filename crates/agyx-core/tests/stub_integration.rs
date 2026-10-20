@@ -369,3 +369,88 @@ fn test_login_cancelled_restores_original() {
     agyx_core::process_manager::set_mock_running_pids(None);
 }
 
+
+#[test]
+fn test_switch_same_account_allowed_while_agy_running() {
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![]));
+    let blob_a = make_blob("sub_multi_term", "multi_term@gmail.com");
+    let adapter = MockAgyAdapter::new();
+    adapter.set_credential(Some(blob_a.clone()));
+
+    let switcher = Switcher::new(Box::new(adapter));
+    switcher.save("account_active").expect("save active");
+
+    // Now simulate AGY running in Terminal 1 (PID 88888)
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![88888]));
+
+    // Switching to the same already-active account in Terminal 2 must succeed without error
+    let res = switcher.switch("account_active").expect("switch same account succeeds while AGY running");
+    assert_eq!(res.profile, "account_active");
+    assert_eq!(res.sub, "sub_multi_term");
+
+    // Cleanup
+    let _ = switcher.remove("account_active");
+    agyx_core::process_manager::set_mock_running_pids(None);
+}
+
+#[test]
+fn test_start_same_account_while_agy_running() {
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![]));
+    let blob_a = make_blob("sub_start_same", "start_same@gmail.com");
+    let adapter = MockAgyAdapter::new();
+    adapter.set_credential(Some(blob_a.clone()));
+
+    let switcher = Switcher::new(Box::new(adapter));
+    switcher.save("account_same").expect("save account");
+
+    // Simulate AGY running in Terminal 1 (PID 77777)
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![77777]));
+
+    // Starting the same account in Terminal 2 launches cleanly without blocking
+    let exit = switcher.start("account_same", &[]).expect("start same account succeeds");
+    assert!(exit.success());
+
+    // Cleanup
+    let _ = switcher.remove("account_same");
+    agyx_core::process_manager::set_mock_running_pids(None);
+}
+
+#[test]
+fn test_start_different_account_while_agy_running() {
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![]));
+    let blob_a = make_blob("sub_active_t1", "t1@gmail.com");
+    let blob_b = make_blob("sub_target_t2", "t2@gmail.com");
+    let adapter = MockAgyAdapter::new();
+    adapter.set_credential(Some(blob_a.clone()));
+
+    let switcher = Switcher::new(Box::new(adapter));
+    switcher.save("profile_t1").expect("save profile_t1");
+
+    // Save profile_t2 into vault
+    let mut vault = agyx_core::credential_store::vault::CredentialVault::open().unwrap();
+    vault.save("profile_t2", &blob_b).unwrap();
+    let mut cfg = agyx_core::config::load_config().unwrap();
+    cfg.profiles.insert("profile_t2".to_string(), agyx_core::config::ProfileMeta {
+        sub: "sub_target_t2".to_string(),
+        email: "t2@gmail.com".to_string(),
+        display_name: None,
+        added_at: "2026-10-20T00:00:00Z".to_string(),
+    });
+    agyx_core::config::save_config(&cfg).unwrap();
+
+    // Now simulate Terminal 1 running AGY with profile_t1 (PID 66666)
+    agyx_core::process_manager::set_mock_running_pids(Some(vec![66666]));
+
+    // In Terminal 2, start profile_t2
+    let exit = switcher.start("profile_t2", &[]).expect("start different account succeeds");
+    assert!(exit.success());
+
+    // Live credential in OS store is now profile_t2
+    let live = switcher.current().unwrap().unwrap();
+    assert_eq!(live.sub, "sub_target_t2");
+
+    // Cleanup
+    let _ = switcher.remove("profile_t1");
+    let _ = switcher.remove("profile_t2");
+    agyx_core::process_manager::set_mock_running_pids(None);
+}

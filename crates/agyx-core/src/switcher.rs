@@ -57,7 +57,7 @@ impl Switcher {
 
     // ── Version check ─────────────────────────────────────────────────────────
 
-    /// Verify AGY is present and warn if the version differs from 1.2.14.
+    /// Verify AGY is present and check if the version is among supported versions.
     pub fn check_version(&self) -> Result<AgyDetection, AgyxError> {
         self.adapter.detect()
     }
@@ -459,9 +459,26 @@ impl Switcher {
         let lock_path = crate::config::lock_file_path()?;
         let _lock = AgyxLock::try_acquire(&lock_path)?;
 
+        let cfg = load_config()?;
+
+        // If the requested profile exists and is already active in the OS store, no swap is required.
+        // This avoids unnecessary process locks and allows multi-terminal commands for the active profile.
+        if let Some(meta) = cfg.profiles.get(name) {
+            if let Ok(Some(current_blob)) = self.adapter.read_credential() {
+                if let Ok(current_id) = extract_identity(&current_blob) {
+                    if current_id.sub == meta.sub {
+                        return Ok(SwitchResult {
+                            profile: name.to_owned(),
+                            email: current_id.email,
+                            sub: current_id.sub,
+                        });
+                    }
+                }
+            }
+        }
+
         ensure_agy_not_running()?;
 
-        let cfg = load_config()?;
         let meta = cfg
             .profiles
             .get(name)
@@ -491,12 +508,73 @@ impl Switcher {
         })
     }
 
+    // ── `agyx start <name>` ───────────────────────────────────────────────────
+
+    /// Start an AGY session with a specific account.
+    ///
+    /// Multi-terminal safe: Allows running the same account or different accounts
+    /// simultaneously across multiple terminals without killing other sessions.
+    /// If `<name>` is already active in the OS store, launches immediately.
+    /// If not active, safely writes `<name>`'s credentials before launching.
+    pub fn start(
+        &self,
+        name: &str,
+        agy_args: &[String],
+    ) -> Result<std::process::ExitStatus, AgyxError> {
+        let cfg = load_config()?;
+        let meta = cfg
+            .profiles
+            .get(name)
+            .ok_or_else(|| AgyxError::ProfileNotFound { name: name.to_owned() })?;
+
+        let expected_sub = meta.sub.clone();
+
+        // Check if the requested account is already active in the OS store.
+        let is_already_active = match self.adapter.read_credential()? {
+            Some(blob) => {
+                if let Ok(id) = extract_identity(&blob) {
+                    id.sub == expected_sub
+                } else {
+                    false
+                }
+            }
+            None => false,
+        };
+
+        if !is_already_active {
+            let lock_path = crate::config::lock_file_path()?;
+            let _lock = AgyxLock::try_acquire(&lock_path)?;
+
+            let vault = CredentialVault::open()?;
+            let blob = vault.load(name)?;
+
+            let id = extract_identity(&blob)?;
+            if id.sub != expected_sub {
+                return Err(AgyxError::internal(format!(
+                    "Vault integrity failure: stored blob for profile '{name}' has sub '{}' but config says '{}'",
+                    id.sub, expected_sub
+                )));
+            }
+
+            self.adapter.write_credential(&blob)?;
+            // Lock is released before launching so other terminals aren't blocked.
+        }
+
+        // Launch AGY (the adapter records the active terminal session).
+        let exit_status = self.adapter.launch(agy_args)?;
+
+        // Post-run token sync-back: only updates vault if the live credential still matches expected_sub.
+        self.sync_back(Some(name), Some(&expected_sub))?;
+
+        Ok(exit_status)
+    }
+
     // ── `agyx run` ────────────────────────────────────────────────────────────
 
-    /// Prepare credentials (optional switch), launch AGY, then sync back.
+    /// Prepare credentials (optional account start), launch AGY, then sync back.
     ///
-    /// If `account` is `None`, launches with whatever credential is currently
-    /// in the OS store.
+    /// Multi-terminal safe: If `account` is `Some(name)`, delegates to [`Switcher::start`].
+    /// If `account` is `None`, launches with whatever credential is currently in the OS store.
     ///
     /// Returns AGY's exit code.
     pub fn run(
@@ -504,26 +582,27 @@ impl Switcher {
         account: Option<&str>,
         agy_args: &[String],
     ) -> Result<std::process::ExitStatus, AgyxError> {
-        // If account specified, switch first.
-        if let Some(name) = account {
-            self.switch(name)?;
+        match account {
+            Some(name) => self.start(name, agy_args),
+            None => {
+                let pre_run_sub = self.adapter.read_credential()?
+                    .as_deref()
+                    .map(extract_identity)
+                    .transpose()?
+                    .map(|i| i.sub);
+
+                let cfg = load_config()?;
+                let active_profile = pre_run_sub.as_ref().and_then(|sub| {
+                    cfg.profiles.iter().find(|(_, m)| &m.sub == sub).map(|(n, _)| n.clone())
+                });
+
+                let exit_status = self.adapter.launch(agy_args)?;
+
+                self.sync_back(active_profile.as_deref(), pre_run_sub.as_deref())?;
+
+                Ok(exit_status)
+            }
         }
-
-        // Record who is active before launch.
-        let pre_run_blob = self.adapter.read_credential()?;
-        let pre_run_sub = pre_run_blob
-            .as_deref()
-            .map(extract_identity)
-            .transpose()?
-            .map(|i| i.sub.clone());
-
-        // Launch AGY.
-        let exit_status = self.adapter.launch(agy_args)?;
-
-        // Post-run token sync-back.
-        self.sync_back(account, pre_run_sub.as_deref())?;
-
-        Ok(exit_status)
     }
 
     /// Sync refreshed tokens back from the live credential to the active

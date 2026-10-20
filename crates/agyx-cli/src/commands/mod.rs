@@ -8,5 +8,7 @@ pub mod rename;
 pub mod restore;
 pub mod run_agy;
 pub mod save;
+pub mod start;
+pub mod stop;
 pub mod switch;
 pub mod version;

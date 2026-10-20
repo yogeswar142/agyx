@@ -33,6 +33,15 @@ pub fn run() -> anyhow::Result<()> {
         if !confirm {
             anyhow::bail!("Restore cancelled.");
         }
+        let terminated = agyx_core::process_manager::terminate_agy_processes()?;
+        if !terminated.is_empty() {
+            println!(
+                "{} Closed running AGY process{}: {:?}.",
+                style("✓").green().bold(),
+                if terminated.len() > 1 { "es" } else { "" },
+                terminated
+            );
+        }
         if !find_agy_pids().is_empty() {
             anyhow::bail!("AGY is still running. Please close it and re-run `agyx restore-original`.");
         }

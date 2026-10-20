@@ -18,6 +18,8 @@ pub const LOCK_FILE: &str = "agyx.lock";
 pub const VAULT_FILE: &str = "agyx_vault.enc";
 /// Filename of the encrypted original-credential backup.
 pub const BACKUP_FILE: &str = "agyx_original_backup.enc";
+/// Filename of the active multi-terminal sessions tracking file.
+pub const SESSIONS_FILE: &str = "agyx_sessions.json";
 
 /// Per-profile metadata stored in the config file (no secrets).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -89,6 +91,11 @@ pub fn vault_file_path() -> Result<PathBuf, AgyxError> {
 /// Returns the path to the encrypted original backup file.
 pub fn backup_file_path() -> Result<PathBuf, AgyxError> {
     Ok(config_dir()?.join(BACKUP_FILE))
+}
+
+/// Returns the path to the active multi-terminal sessions tracking file.
+pub fn sessions_file_path() -> Result<PathBuf, AgyxError> {
+    Ok(config_dir()?.join(SESSIONS_FILE))
 }
 
 /// Load the config from disk, returning a default if it does not exist.

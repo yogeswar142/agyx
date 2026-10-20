@@ -48,7 +48,19 @@ if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 }
 
-Copy-Item -Path $releaseExe -Destination $targetExe -Force
+try {
+    Copy-Item -Path $releaseExe -Destination $targetExe -Force
+} catch {
+    # If the file is in use (e.g. running under an active terminal session or agyx run),
+    # rename the existing file aside and copy the new binary.
+    $tempOld = "$targetExe.old"
+    if (Test-Path $tempOld) {
+        Remove-Item $tempOld -Force -ErrorAction SilentlyContinue
+    }
+    Move-Item -Path $targetExe -Destination $tempOld -Force
+    Copy-Item -Path $releaseExe -Destination $targetExe -Force
+    Remove-Item $tempOld -Force -ErrorAction SilentlyContinue
+}
 Write-Host "Copied binary to: $targetExe" -ForegroundColor Green
 
 # 4. Modify User PATH via Registry (HKCU\Environment) preserving REG_EXPAND_SZ

@@ -35,6 +35,8 @@ COMMAND SUMMARY:
   accounts, ls                List all saved accounts and mark active profile
   current                     Show live account in OS credential store (source of truth)
   switch <name>               Switch live AGY credentials to the specified profile
+  start <name> [-- <args>]    Start AGY with named account (multi-terminal safe, zero session conflict)
+  stop, kill [name]           Terminate running AGY processes (optionally for a specific profile)
   run [-a <name>] [-- <args>] Launch AGY with active or specified profile, syncing refreshed tokens
   doctor                      Run system health and environment diagnostics
   rename <old> <new>          Rename a saved profile
@@ -52,9 +54,9 @@ RECOVERY:
     directly at any time to re-authenticate normally.
 
 LIMITATIONS & SAFETY:
-  • One Active Account: Only one AGY credential slot exists system-wide (target 'gemini:antigravity').
-  • AGY Must Be Closed: AGY must be closed before switching to avoid token overwrite and race conditions.
-  • Platform Support: Verified against AGY 1.2.14 on Windows ARM64 (Qualcomm Snapdragon X2).
+  • Multi-Terminal Sessions: Run multiple terminals with the same account or different accounts simultaneously using 'agyx start <name>' or 'agyx run'.
+  • Active Account Default: System credential slot (gemini:antigravity) holds the default account; running terminals hold their loaded tokens in memory.
+  • Platform Support: Verified against AGY 1.2.14, 1.3.2, and 1.4.3 on Windows ARM64 (Qualcomm Snapdragon X2).
     macOS and Linux backends are unverified stubs pending Phase 2 discovery.
   • Non-Cryptographic Identity: OIDC id_token sub/email are parsed for identification only;
     JWT signatures are NOT verified. Do not use them as a security boundary.
@@ -133,6 +135,38 @@ overwrites. Checks the process table and prompts if AGY is running.",
         name: String,
     },
 
+    /// Start an AGY session with a specific account (supports multiple terminals and different accounts).
+    #[command(
+        long_about = "\
+Starts an AGY session with the specified account.\n\n\
+Allows multiple terminals to run the same account or different accounts simultaneously \
+without errors or killing active sessions. Trailing arguments are passed directly to AGY.",
+        after_help = "EXAMPLES:\n  agyx start personal\n  agyx start yoges\n  agyx start college -- --continue\n  agyx start work -- -p \"Explain main.rs\""
+    )]
+    Start {
+        /// Profile name to start (e.g. 'personal', 'yoges', 'lali').
+        name: String,
+
+        /// Arguments to pass through to AGY.
+        #[arg(last = true, value_name = "AGY_ARGS")]
+        args: Vec<String>,
+    },
+
+    /// Terminate running AGY processes.
+    #[command(
+        alias = "kill",
+        alias = "close",
+        long_about = "\
+Terminates currently running AGY (agy.exe) processes.\n\n\
+Optionally specify a profile name to terminate only sessions for that profile, \
+or omit to terminate all running AGY instances.",
+        after_help = "EXAMPLES:\n  agyx stop\n  agyx stop yoges\n  agyx kill"
+    )]
+    Stop {
+        /// Optional profile name whose sessions to stop.
+        account: Option<String>,
+    },
+
     /// Launch AGY, optionally with a specific account.
     #[command(
         long_about = "\
@@ -201,7 +235,7 @@ Verifies sub match and requires AGY to be closed.",
     /// Show quota information (Phase 2 — currently reports 'unknown').
     #[command(
         long_about = "\
-Shows quota information. In Phase 1, reports 'unknown' honestly because AGY 1.2.14 does not \
+Shows quota information. In Phase 1, reports 'unknown' honestly because AGY (tested up to 1.3.2) does not \
 expose a public CLI quota interface. Phase 2 will investigate safe options.",
         after_help = "EXAMPLES:\n  agyx quota"
     )]
@@ -209,7 +243,7 @@ expose a public CLI quota interface. Phase 2 will investigate safe options.",
 
     /// Check the AGY version and AGYX adapter compatibility.
     #[command(
-        long_about = "Displays AGYX version, detected AGY version, tested version (1.2.14), executable path, and OS platform/architecture.",
+        long_about = "Displays AGYX version, detected AGY version, tested versions (1.2.14, 1.3.2), executable path, and OS platform/architecture.",
         after_help = "EXAMPLES:\n  agyx version"
     )]
     Version,
@@ -264,6 +298,8 @@ fn dispatch(cli: Cli) -> anyhow::Result<()> {
         Commands::Accounts => commands::accounts::run(),
         Commands::Current => commands::current::run(),
         Commands::Switch { name } => commands::switch::run(&name),
+        Commands::Start { name, args } => commands::start::run(&name, &args),
+        Commands::Stop { account } => commands::stop::run(account.as_deref()),
         Commands::Run { account, args } => commands::run_agy::run(account.as_deref(), &args),
         Commands::Doctor { redact } => commands::doctor::run(redact),
         Commands::Rename { old, new } => commands::rename::run(&old, &new),
